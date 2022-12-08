@@ -1,0 +1,182 @@
+#!/usr/local/bin/python3
+# -*- coding: utf-8 -*-
+
+import winreg, subprocess, sys, logging, logging.handlers
+
+#------------------------------------------------------------------------------------------------
+
+# Настройки папок и дисков
+source_dir="Z:\Windows"
+volume1="S:"
+volume2="W:"
+
+# Список операционных систем
+# Первая цифра:
+#       -1 - запрещено устанавливать (могут отсутствовать файлы установки)
+#        0 - (по умолчанию) разрешено устанавливать
+#        1..255 - разрешено устанавливать (номер пункта меню), определяется автоматически
+# Именование файлов wim (на примере win10):
+#        win10_25.10.2022.wim
+win_menu=[
+    "0","winxp","29.11.2019","Установка Windows XP SP3", "disk_mbr1.txt",
+    "0","win7", "30.11.2022","Установка Windows 7 Pro SP1 (x64)", "disk_mbr2.txt",
+    "0","win10","25.10.2022","Установка Windows 10 Pro (x64)", "disk_gpt2.txt",
+    "-1","win11","25.11.2022","Установка Windows 11 Pro (x64)", "disk_gpt2.txt"
+    ]
+
+#------------------------------------------------------------------------------------------------
+
+# Получение ip адреса клиента
+p = subprocess.Popen(["cmd", "/c", "ipconfig"], stdout=subprocess.PIPE)
+for line in iter(p.stdout.readline, b''):
+  if line.decode('utf-8').find("IPv4") != -1:
+    client_ip = line.decode('utf-8').split(":")[1].strip()
+
+# Определение UEFI или BIOS
+def pefirmwaretype():
+  try:
+    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, "System\CurrentControlSet\Control")
+    value = winreg.QueryValueEx(key, "PEFirmwareType")[0]
+    winreg.CloseKey(key)
+    if value == 1: return "BIOS"
+    if value == 2: return "UEFI"
+  except WindowsError:
+    return "Unknown"
+
+# Определение разрядности PE образа
+def peimagebits():
+  return "64" if sys.maxsize > 2**32 else "32"
+
+# Определение возможностей CPU
+def cpubits():
+  try:
+    result = subprocess.run(["cpuid"],capture_output=True, encoding="utf-8").stdout
+  except:
+    pass
+  return result
+
+# Вывод сообщений запущенных процессов
+def print_cmd_stdout(process):
+  applying_image = False
+  for line in iter(process.stdout.readline, b''):
+    # Проверка на индикатор прогресс бара (вывод на той же строке)
+    if line.decode('utf-8').find("Applying image") != -1:  applying_image = True
+    if line.decode('utf-8').find("100.0%") != -1 and applying_image: applying_image = False
+    if line.decode('utf-8').find("[") != -1 and applying_image:
+      print(line.decode('utf-8').rstrip('\n'), end='\r')
+    else:
+      # Вывод обычным образом
+      print(line.decode('utf-8').rstrip('\n'))
+
+# Установка Windows
+def install_win(win_ver):
+  subprocess.run(["cmd", "/c", "title "+win_menu[win_menu.index(win_ver)+2]+" (версия "+win_menu[win_menu.index(win_ver)+1]+") и перезагрузка"])
+
+  # Разметка диска и форматирование
+  p = subprocess.Popen(["cmd", "/c", "diskpart /s ", source_dir+"\\"+win_menu[win_menu.index(win_ver)+3]], stdout=subprocess.PIPE)
+  print_cmd_stdout(p)
+  log.info("PXE "+client_ip+" Disk completed for install "+win_ver)
+
+  # Установка из wim образа
+  if win_ver == "winxp":
+    p = subprocess.Popen(["cmd", "/c", "dism /apply-image /imagefile:"+source_dir+"\\"+win_ver+"_"+win_menu[win_menu.index(win_ver)+1]+".wim /index:1 /applydir:"+volume1], stdout=subprocess.PIPE)
+    print_cmd_stdout(p)
+  if win_ver == "win7" or win_ver == "win10" or win_ver == "win11":
+    p = subprocess.Popen(["cmd", "/c", "dism /apply-image /imagefile:"+source_dir+"\\"+win_ver+"_"+win_menu[win_menu.index(win_ver)+1]+".wim /index:1 /applydir:"+volume2], stdout=subprocess.PIPE)
+    print_cmd_stdout(p)
+  log.info("PXE "+client_ip+" Applied wim image for "+win_ver)
+
+  # Настройка загрузчика
+  if win_ver == "win7":
+    p = subprocess.Popen(["cmd", "/c", "bcdboot "+volume2+"\\"+"windows /l ru-RU /s "+volume1+" /f BIOS"], stdout=subprocess.PIPE)
+    print_cmd_stdout(p)
+  if win_ver == "win10" or win_ver == "win11":
+    p = subprocess.Popen(["cmd", "/c", "bcdboot "+volume2+"\\"+"windows /l ru-RU /s "+volume1+" /f all"], stdout=subprocess.PIPE)
+    print_cmd_stdout(p)
+  if win_ver == "win7" or win_ver == "win10" or win_ver == "win11":
+    log.info("PXE "+client_ip+" Bcdboot completed for image "+win_ver)
+
+  # Завершение установки
+  print("----------------------------------------------------------------")
+  print("Установка завершена, подготовка к перезагрузке")
+  p = subprocess.Popen(["cmd", "/c", "ping -n 4 localhost > nul"], stdout=subprocess.PIPE)
+  #p = subprocess.Popen(["cmd", "/c", "wpeutil reboot"], stdout=subprocess.PIPE)
+  subprocess.run(["cmd", "/c", "pause"])
+
+# Меню
+def run_menu():
+  subprocess.run(["cmd", "/c", "title Меню установки - ",pefirmwaretype(),peimagebits()])
+  log.info("PXE "+client_ip+" Menu running")
+  mes=""
+  while mes != "0" and mes != "installed":
+    # Очистка экрана и вывод шапки
+    subprocess.run(["cmd", "/c", "cls"])
+    print()
+    print("  Порядок работы:")
+    print()
+    print("      0) Выход в командную строку")
+    # Вывод меню и нумерация
+    pos = 0
+    menu_num = 0
+    while pos < len(win_menu):
+      if int(win_menu[pos]) >= 0:
+        menu_num = menu_num + 1
+        win_menu[pos] = str(menu_num)
+        print()
+        print("      "+str(menu_num)+") "+win_menu[pos+3]+" (версия "+win_menu[pos+2]+")")
+        print("         (Жёсткий диск будет предварительно форматирован)")
+      pos = pos + 5
+    # Выбор пункта меню
+    print()
+    print("  Для выбора пункта меню введи соответствующую ему цифру и нажми Enter: ", end = '')
+    try:
+      mes = input()
+    except:
+      pass
+    # Поиск образа по выбранному номеру и запуск установки
+    pos = 0
+    while pos < len(win_menu):
+      if win_menu[pos] == mes:
+        subprocess.run(["cmd", "/c", "cls"])
+        log.info("PXE "+client_ip+" Menu selected: "+mes+" "+win_menu[pos+1])
+        mes = "installed"
+        install_win(win_menu[pos+1])
+        break
+      pos = pos + 5
+  # Завершение работы
+  log.info("PXE "+client_ip+" Menu completed")
+
+#------------------------------------------------------------------------------------------------
+
+# Главный модуль программы
+if __name__ =='__main__':
+  # Проверки перед запуском меню
+  # Введён адрес PXE сервера?
+  if len(sys.argv) != 2: print("Usage: install.py <pxe_server>"); sys.exit()
+  # Это PE образ?
+  if pefirmwaretype()=="Unknown": print("Cannot run - not PE Image"); sys.exit()
+  # Указан ip адрес PXE сервера?
+  pxe_server = sys.argv[1]
+  connect_no = True
+  p = subprocess.Popen(["cmd", "/c", "ping -n 2 ", pxe_server], stdout=subprocess.PIPE)
+  for line in iter(p.stdout.readline, b''):
+    if line.decode('utf-8').find("Lost") != -1 and line.decode('utf-8').split("(")[1].split("%")[0] == "0":
+      connect_no = False
+      break
+  if connect_no: print("Cannot run - no connection to PXE server"); sys.exit()
+  # Файлы все на месте?
+  pos = 0
+  import os.path
+  while pos < len(win_menu):
+    if win_menu[pos] == "0" and os.path.isfile(win_menu[pos+4]) == False: print("Cannot run - file "+win_menu[pos+4]+" not found"); sys.exit()
+    if win_menu[pos] == "0" and os.path.isfile(win_menu[pos+1]+"_"+win_menu[pos+2]+".wim") == False: print("Cannot run - file "+win_menu[pos+1]+"_"+win_menu[pos+2]+".wim"+" not found"); sys.exit()
+    pos = pos + 5
+  #
+  # Все проверки прошли успешно
+  #
+  # Настройка логирования на PXE сервер
+  log = logging.getLogger('log')
+  log.setLevel(logging.INFO)
+  log.addHandler(logging.handlers.SysLogHandler(address = (pxe_server,514)))
+  # Запуск меню
+  run_menu()

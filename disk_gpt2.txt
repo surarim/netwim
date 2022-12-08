@@ -1,0 +1,11 @@
+rescan
+list disk
+select disk 0
+clean
+convert gpt
+create partition efi size=100
+format fs=fat32 label="EFI" quick
+assign letter=s
+create partition primary
+format fs=ntfs label="System" quick
+assign letter=w

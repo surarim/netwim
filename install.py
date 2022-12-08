@@ -150,6 +150,8 @@ def run_menu():
 
 # Главный модуль программы
 if __name__ =='__main__':
+  import os
+  os.chdir(source_dir)
   # Проверки перед запуском меню
   # Введён адрес PXE сервера?
   if len(sys.argv) != 2: print("Usage: install.py <pxe_server>"); sys.exit()

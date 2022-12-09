@@ -11,12 +11,14 @@ volume1="S:"
 volume2="W:"
 
 # Список операционных систем
-# Первая цифра:
-#       -1 - запрещено устанавливать (могут отсутствовать файлы установки)
+# Первый параметр:
+#       -1 - разрешено устанавливать (могут отсутствовать файлы установки, скрытый пункт меню)
 #        0 - (по умолчанию) разрешено устанавливать
 #        1..255 - разрешено устанавливать (номер пункта меню), определяется автоматически
-# Именование файлов wim (на примере win10):
-#        win10_25.10.2022.wim
+# Второй и третий параметр:
+#        Именование файлов wim (на примере win10): win10_25.10.2022.wim
+# Четвёрый параметр: Строка меню
+# Пятый параметр: имя файла с шаблоном для разметки диска
 win_menu=[
     "0","winxp","29.11.2019","Установка Windows XP SP3", "disk_mbr1.txt",
     "0","win7", "30.11.2022","Установка Windows 7 Pro SP1 (x64)", "disk_mbr2.txt",
@@ -47,13 +49,25 @@ def pefirmwaretype():
 def peimagebits():
   return "64" if sys.maxsize > 2**32 else "32"
 
-# Определение возможностей CPU
-def cpubits():
-  try:
-    result = subprocess.run(["cpuid"],capture_output=True, encoding="utf-8").stdout
-  except:
-    pass
-  return result
+# Определение возможности установки (проверка CPU)
+def cpu_warning_bits(win_ver):
+  cpubits = subprocess.run(["cpuid"+peimagebits()],capture_output=True, encoding="utf-8").stdout
+  cpu_warning_mes = "\033[1mВнимание!\033[0m Система может не запустится\n          Процессор не поддерживает"
+  cpu_warning_bits = ""
+  if win_ver == "win7" or win_ver == "win10" or win_ver == "win11":
+    if cpubits.find("x86_64") == -1: cpu_warning_bits += " x86_64"
+    if cpubits.find("PAE") == -1: cpu_warning_bits += " PAE"
+    if cpubits.find("NX") == -1: cpu_warning_bits += " NX"
+  if win_ver == "win10" or win_ver == "win11":
+    if cpubits.find("CMPXCHG16B") == -1: cpu_warning_bits += " CMPXCHG16B"
+    if cpubits.find("LAHF/SAHF") == -1: cpu_warning_bits += " LAHF/SAHF"
+    if cpubits.find("PREFETCHW") == -1: cpu_warning_bits += " PREFETCHW"
+  if win_ver == "win11":
+    if cpubits.find("SSE4.1") == -1: cpu_warning_bits += " SSE4.1"
+  if len(cpu_warning_bits) > 0:
+    return cpu_warning_mes + cpu_warning_bits
+  else:
+    return "Процессор поддерживает все необходимые функции"
 
 # Вывод сообщений запущенных процессов
 def print_cmd_stdout(process):
@@ -119,12 +133,14 @@ def run_menu():
     pos = 0
     menu_num = 0
     while pos < len(win_menu):
-      if int(win_menu[pos]) >= 0:
+      # Номер 0 (определить номер пункта автоматически)
+      if int(win_menu[pos]) == 0:
         menu_num = menu_num + 1
         win_menu[pos] = str(menu_num)
         print()
         print("      "+str(menu_num)+") "+win_menu[pos+3]+" (версия "+win_menu[pos+2]+")")
-        print("         (Жёсткий диск будет предварительно форматирован)")
+        # Вывод дополнительной информации о возможности установки (проверка CPU)
+        print("         ("+cpu_warning_bits(win_menu[pos+1])+")")
       pos = pos + 5
     # Выбор пункта меню
     print()
@@ -153,6 +169,7 @@ if __name__ =='__main__':
   import os
   os.chdir(source_dir)
   # Проверки перед запуском меню
+  # -----------------------------------------------------------------------
   # Введён адрес PXE сервера?
   if len(sys.argv) != 2: print("Usage: install.py <pxe_server>"); sys.exit()
   # Это PE образ?
@@ -167,13 +184,16 @@ if __name__ =='__main__':
       break
   if connect_no: print("Cannot run - no connection to PXE server"); sys.exit()
   # Файлы все на месте?
+  if os.path.isfile('cpuid'+peimagebits()+'.exe') == False: print("Cannot run - cpuid"+peimagebits()+" not found"); sys.exit()
+  try: subprocess.run(["cpuid"+peimagebits()],capture_output=True, encoding="utf-8").stdout
+  except: print("Cannot run - cpuid"+peimagebits()+" error"); sys.exit()
   pos = 0
   import os.path
   while pos < len(win_menu):
     if win_menu[pos] == "0" and os.path.isfile(win_menu[pos+4]) == False: print("Cannot run - file "+win_menu[pos+4]+" not found"); sys.exit()
     if win_menu[pos] == "0" and os.path.isfile(win_menu[pos+1]+"_"+win_menu[pos+2]+".wim") == False: print("Cannot run - file "+win_menu[pos+1]+"_"+win_menu[pos+2]+".wim"+" not found"); sys.exit()
     pos = pos + 5
-  #
+  # -----------------------------------------------------------------------
   # Все проверки прошли успешно
   #
   # Настройка логирования на PXE сервер

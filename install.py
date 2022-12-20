@@ -45,6 +45,23 @@ def pefirmwaretype():
   except WindowsError:
     return "Unknown"
 
+# Получение версии ACPI (если найдена таблица XSDT - 2.0, иначе 1.0)
+def acpi_version():
+  path = "HARDWARE\ACPI\RSDT"
+  while True:
+    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path)
+    try:
+      subkey = winreg.EnumKey(key,0)
+      if subkey: path = path + "\\" + subkey
+      winreg.CloseKey(key)
+    except:
+      break
+  try:
+    subvalue = winreg.EnumValue(key,0)[1]
+  except:
+    pass
+  return "2.0" if subvalue and subvalue.find(b"XSDT") != -1 else "1.0"
+
 # Определение разрядности PE образа
 def peimagebits():
   return "64" if sys.maxsize > 2**32 else "32"

@@ -66,10 +66,11 @@ def acpi_version():
 def peimagebits():
   return "64" if sys.maxsize > 2**32 else "32"
 
-# Определение возможности установки (проверка CPU)
-def cpu_warning_bits(win_ver):
+# Определение возможности установки (проверка CPU и ACPI)
+def install_warning(win_ver):
+  warning_mes = "\033[1mВнимание!\033[0m Система может не запустится\n          "
+  # Проверка CPU
   cpubits = subprocess.run(["cpuid"+peimagebits()],capture_output=True, encoding="utf-8").stdout
-  cpu_warning_mes = "\033[1mВнимание!\033[0m Система может не запустится\n          Процессор не поддерживает"
   cpu_warning_bits = ""
   if win_ver == "win7" or win_ver == "win10" or win_ver == "win11":
     if cpubits.find("x86_64") == -1: cpu_warning_bits += " x86_64"
@@ -81,10 +82,16 @@ def cpu_warning_bits(win_ver):
     if cpubits.find("PREFETCHW") == -1: cpu_warning_bits += " PREFETCHW"
   if win_ver == "win11":
     if cpubits.find("SSE4.1") == -1: cpu_warning_bits += " SSE4.1"
-  if len(cpu_warning_bits) > 0:
-    return cpu_warning_mes + cpu_warning_bits
+  cpu_warning_mes = warning_mes + "Процессор не поддерживает" + cpu_warning_bits if len(cpu_warning_bits) > 0 else "Процессор поддерживает все необходимые функции"
+  # Проверка ACPI
+  acpi_warning_bits = ""
+  if acpi_version() == "2.0" and win_ver == "winxp":
+    acpi_warning_bits = "Операционная система не поддерживает ACPI 2.0 материнской платы"
+    acpi_warning_mes = "          " + warning_mes + acpi_warning_bits
   else:
-    return "Процессор поддерживает все необходимые функции"
+    acpi_warning_mes = "          Операционная система поддерживает ACPI материнской платы"
+  # Вывод результата
+  return cpu_warning_mes + "\n" + acpi_warning_mes
 
 # Вывод сообщений запущенных процессов
 def print_cmd_stdout(process):
@@ -157,7 +164,7 @@ def run_menu():
         print()
         print("      "+str(menu_num)+") "+win_menu[pos+3]+" (версия "+win_menu[pos+2]+")")
         # Вывод дополнительной информации о возможности установки (проверка CPU)
-        print("         ("+cpu_warning_bits(win_menu[pos+1])+")")
+        print("         ("+install_warning(win_menu[pos+1])+")")
       pos = pos + 5
     # Выбор пункта меню
     print()

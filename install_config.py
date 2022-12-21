@@ -1,6 +1,9 @@
 #!/usr/local/bin/python3
 # -*- coding: utf-8 -*-
 
+# Игнорировать проверку пользователя
+ignore_auth = True
+
 # Имя домена Active Directory
 domain = "DOM.LOCAL"
 

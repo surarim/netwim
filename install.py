@@ -23,6 +23,10 @@ for line in iter(p.stdout.readline, b''):
   if line.decode('utf-8').find("IPv4") != -1:
     client_ip = line.decode('utf-8').split(":")[1].strip()
 
+# Проверка пользователя по группе в домене Active Directory
+def check_user():
+  print("Cannot run - current user not allowed"); sys.exit()
+
 # Определение UEFI или BIOS
 def pefirmwaretype():
   try:
@@ -204,6 +208,8 @@ if __name__ =='__main__':
     if win_menu[pos] == "0" and os.path.isfile(win_menu[pos+4]) == False: print("Cannot run - file "+win_menu[pos+4]+" not found"); sys.exit()
     if win_menu[pos] == "0" and os.path.isfile(win_menu[pos+1]+"_"+win_menu[pos+2]+".wim") == False: print("Cannot run - file "+win_menu[pos+1]+"_"+win_menu[pos+2]+".wim"+" not found"); sys.exit()
     pos = pos + 5
+  # Проверка пользователя по группе в домене Active Directory
+  if not ignore_auth: check_user()
   # -----------------------------------------------------------------------
   # Все проверки прошли успешно
   #

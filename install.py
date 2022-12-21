@@ -1,30 +1,19 @@
 #!/usr/local/bin/python3
 # -*- coding: utf-8 -*-
 
-import winreg, subprocess, sys, logging, logging.handlers
+import winreg, subprocess, sys, os, logging, logging.handlers
 
-#------------------------------------------------------------------------------------------------
+# Установка рабочей папки
+workdir = os.path.abspath(os.path.dirname(__file__))
+os.chdir(workdir)
+sys.path.append(workdir)
 
-# Настройки папок и дисков
-source_dir="Z:\Windows"
-volume1="S:"
-volume2="W:"
-
-# Список операционных систем
-# Первый параметр:
-#       -1 - разрешено устанавливать (могут отсутствовать файлы установки, скрытый пункт меню)
-#        0 - (по умолчанию) разрешено устанавливать
-#        1..255 - разрешено устанавливать (номер пункта меню), определяется автоматически
-# Второй и третий параметр:
-#        Именование файлов wim (на примере win10): win10_25.10.2022.wim
-# Четвёрый параметр: Строка меню
-# Пятый параметр: имя файла с шаблоном для разметки диска
-win_menu=[
-    "0","winxp","29.11.2019","Установка Windows XP SP3", "disk_mbr1.txt",
-    "0","win7", "30.11.2022","Установка Windows 7 Pro SP1 (x64)", "disk_mbr2.txt",
-    "0","win10","25.10.2022","Установка Windows 10 Pro (x64)", "disk_gpt2.txt",
-    "-1","win11","25.11.2022","Установка Windows 11 Pro (x64)", "disk_gpt2.txt"
-    ]
+# Загрузка внутреннего модуля конфигурации
+try:
+  from install_config import *
+except ModuleNotFoundError as err:
+  print("Cannot run - " + str(err))
+  sys.exit()
 
 #------------------------------------------------------------------------------------------------
 
@@ -111,16 +100,16 @@ def install_win(win_ver):
   subprocess.run(["cmd", "/c", "title "+win_menu[win_menu.index(win_ver)+2]+" (версия "+win_menu[win_menu.index(win_ver)+1]+") и перезагрузка"])
 
   # Разметка диска и форматирование
-  p = subprocess.Popen(["cmd", "/c", "diskpart /s ", source_dir+"\\"+win_menu[win_menu.index(win_ver)+3]], stdout=subprocess.PIPE)
+  p = subprocess.Popen(["cmd", "/c", "diskpart /s ", workdir+"\\"+win_menu[win_menu.index(win_ver)+3]], stdout=subprocess.PIPE)
   print_cmd_stdout(p)
   log.info("PXE "+client_ip+" Disk completed for install "+win_ver)
 
   # Установка из wim образа
   if win_ver == "winxp":
-    p = subprocess.Popen(["cmd", "/c", "dism /apply-image /imagefile:"+source_dir+"\\"+win_ver+"_"+win_menu[win_menu.index(win_ver)+1]+".wim /index:1 /applydir:"+volume1], stdout=subprocess.PIPE)
+    p = subprocess.Popen(["cmd", "/c", "dism /apply-image /imagefile:"+workdir+"\\"+win_ver+"_"+win_menu[win_menu.index(win_ver)+1]+".wim /index:1 /applydir:"+volume1], stdout=subprocess.PIPE)
     print_cmd_stdout(p)
   if win_ver == "win7" or win_ver == "win10" or win_ver == "win11":
-    p = subprocess.Popen(["cmd", "/c", "dism /apply-image /imagefile:"+source_dir+"\\"+win_ver+"_"+win_menu[win_menu.index(win_ver)+1]+".wim /index:1 /applydir:"+volume2], stdout=subprocess.PIPE)
+    p = subprocess.Popen(["cmd", "/c", "dism /apply-image /imagefile:"+workdir+"\\"+win_ver+"_"+win_menu[win_menu.index(win_ver)+1]+".wim /index:1 /applydir:"+volume2], stdout=subprocess.PIPE)
     print_cmd_stdout(p)
   log.info("PXE "+client_ip+" Applied wim image for "+win_ver)
 
@@ -190,8 +179,6 @@ def run_menu():
 
 # Главный модуль программы
 if __name__ =='__main__':
-  import os
-  os.chdir(source_dir)
   # Проверки перед запуском меню
   # -----------------------------------------------------------------------
   # Введён адрес PXE сервера?

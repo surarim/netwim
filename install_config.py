@@ -7,6 +7,9 @@ ignore_auth = True
 # Имя домена Active Directory
 domain = "DOM.LOCAL"
 
+# Путь поиска для проверки пользователя
+search_base = "dc=dom,dc=local"
+
 # Имя контроллера домена Active Directory
 ad_server = "ads"
 

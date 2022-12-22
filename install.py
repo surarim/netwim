@@ -25,7 +25,30 @@ for line in iter(p.stdout.readline, b''):
 
 # Проверка пользователя по группе в домене Active Directory
 def check_user():
-  print("Cannot run - current user not allowed"); sys.exit()
+  from ldap3 import Server, Connection, SAFE_SYNC
+  import getpass
+  # Проверка пользователя и пароля
+  password_ok = "no"
+  while True:
+    username = input("Имя пользователя " + domain + " (например ivanov_iv): ")
+    password = getpass.getpass("Пароль пользователя: ")
+    try:
+      conn = Connection(Server(ad_server), domain+'\\'+username, password, client_strategy=SAFE_SYNC, auto_bind=True)
+      status, result, response, _ = conn.search(search_base, '(objectclass=person)')
+      password_ok = "yes"
+      break
+    except:
+      print("Неверный пользователь/пароль")
+  # Проверка пользователя на принадлежность к группе
+  group_ok = "no"
+  try:
+    status, result, response, _ = conn.search(search_base, search_filter='(sAMAccountName='+ username +')', attributes=['memberof'])
+    for entry in response[0]['attributes']['memberof']:
+      if entry.index(ad_group_install) != -1:
+        group_ok = "yes"
+  except:
+    pass
+  if group_ok == "no": print("Неверная группа пользователя"); sys.exit()
 
 # Определение UEFI или BIOS
 def pefirmwaretype():

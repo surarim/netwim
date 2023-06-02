@@ -174,8 +174,7 @@ def install_win(win_ver):
   print("----------------------------------------------------------------")
   print("Установка завершена, подготовка к перезагрузке")
   p = subprocess.Popen(["cmd", "/c", "ping -n 4 localhost > nul"], stdout=subprocess.PIPE)
-  #p = subprocess.Popen(["cmd", "/c", "wpeutil reboot"], stdout=subprocess.PIPE)
-  subprocess.run(["cmd", "/c", "pause"])
+  p = subprocess.Popen(["cmd", "/c", "wpeutil reboot"], stdout=subprocess.PIPE)
 
 # Меню
 def run_menu():

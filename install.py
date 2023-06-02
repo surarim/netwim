@@ -84,7 +84,7 @@ def peimagebits():
 
 # Определение возможности установки (проверка CPU и ACPI)
 def install_warning(win_ver):
-  warning_mes = "\033[1mВнимание!\033[0m Система может не запустится\n          "
+  warning_found = 0
   # Проверка CPU
   cpubits = subprocess.run(["cpuid"+peimagebits()],capture_output=True, encoding="utf-8").stdout
   cpu_warning_bits = ""
@@ -98,16 +98,36 @@ def install_warning(win_ver):
     if cpubits.find("PREFETCHW") == -1: cpu_warning_bits += " PREFETCHW"
   if win_ver == "win11":
     if cpubits.find("SSE4.1") == -1: cpu_warning_bits += " SSE4.1"
-  cpu_warning_mes = warning_mes + "Процессор не поддерживает" + cpu_warning_bits if len(cpu_warning_bits) > 0 else "Процессор поддерживает все необходимые функции"
-  # Проверка ACPI
-  acpi_warning_bits = ""
-  if acpi_version() == "2.0" and win_ver == "winxp":
-    acpi_warning_bits = "Операционная система не поддерживает ACPI 2.0 материнской платы"
-    acpi_warning_mes = "          " + warning_mes + acpi_warning_bits
+  if len(cpu_warning_bits) > 0:
+    warning_found = 1
+    cpu_warning_mes = "          \033[31mПроцессор не поддерживает" + cpu_warning_bits + "\033[0m"
   else:
-    acpi_warning_mes = "          Операционная система поддерживает ACPI материнской платы"
+    cpu_warning_mes = ""
+  # Проверка ACPI
+  if acpi_version() == "2.0" and win_ver == "winxp":
+    warning_found = 1
+    acpi_warning_mes = "          \033[31mОперационная система не поддерживает ACPI 2.0 материнской платы\033[0m"
+  else:
+    acpi_warning_mes = ""
+  # Проверка MBR
+  mbr_warning_mes = ""
+  if pefirmwaretype() == "UEFI" and (win_ver == "winxp" or win_ver == "win7"):
+    warning_found = 1
+    mbr_warning_mes = "          \033[31mBIOS материнской платы может не грузится с MBR разделов на диске\033[0m"
+  else:
+    mbr_warning_mes = ""
+  #
   # Вывод результата
-  return cpu_warning_mes + "\n" + acpi_warning_mes
+  result_mes = ""
+  if warning_found == 1:
+    result_mes = "\033[1mВнимание!\033[0m Система может не запустится          "
+  if cpu_warning_mes != "":
+    result_mes += "\n" + cpu_warning_mes
+  if acpi_warning_mes != "":
+    result_mes += "\n" + acpi_warning_mes
+  if mbr_warning_mes != "":
+    result_mes += "\n" + mbr_warning_mes
+  return result_mes
 
 # Вывод сообщений запущенных процессов
 def print_cmd_stdout(process):
@@ -180,7 +200,8 @@ def run_menu():
         print()
         print("      "+str(menu_num)+") "+win_menu[pos+3]+" (версия "+win_menu[pos+2]+")")
         # Вывод дополнительной информации о возможности установки (проверка CPU)
-        print("         ("+install_warning(win_menu[pos+1])+")")
+        if install_warning(win_menu[pos+1]) != "":
+          print("         ("+install_warning(win_menu[pos+1])+")")
       pos = pos + 5
     # Выбор пункта меню
     print()

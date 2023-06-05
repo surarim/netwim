@@ -177,7 +177,7 @@ def install_win(win_ver):
     p = subprocess.Popen(["cmd", "/c", "bcdboot "+volume2+"\\"+"windows /l ru-RU /s "+volume1+" /f all"], stdout=subprocess.PIPE)
     print_cmd_stdout(p)
   if win_ver == "win7" or win_ver == "win10" or win_ver == "win11":
-    log.info("PXE "+client_ip+" Bcdboot completed for image "+win_ver)
+    log.info("PXE "+client_ip+" Bcdboot configured for image "+win_ver)
 
   # Завершение установки
   print("----------------------------------------------------------------")

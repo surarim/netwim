@@ -119,12 +119,17 @@ def install_warning(win_ver):
   else:
     acpi_warning_mes = ""
   # Проверка MBR
-  mbr_warning_mes = ""
   if pefirmwaretype() == "UEFI" and (win_ver == "winxp" or win_ver == "win7"):
     warning_found = 1
     mbr_warning_mes = "          \033[31mBIOS материнской платы может не грузится с MBR разделов на диске\033[0m"
   else:
     mbr_warning_mes = ""
+  # Проверка CSM
+  if pefirmwaretype() == "BIOS" and win_ver == "win11":
+    warning_found = 1
+    csm_warning_mes = "          \033[31mОперационная система может не загрузится в режиме CSM\033[0m"
+  else:
+    csm_warning_mes = ""
   #
   # Вывод результата
   result_mes = ""
@@ -136,6 +141,8 @@ def install_warning(win_ver):
     result_mes += "\n" + acpi_warning_mes
   if mbr_warning_mes != "":
     result_mes += "\n" + mbr_warning_mes
+  if csm_warning_mes != "":
+    result_mes += "\n" + csm_warning_mes
   return result_mes
 
 # Вывод сообщений запущенных процессов

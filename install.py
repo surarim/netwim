@@ -257,6 +257,7 @@ if __name__ =='__main__':
   # Все проверки прошли успешно
   #
   # Настройка логирования на PXE сервер
+  # type="imudp" port="514"
   log = logging.getLogger('log')
   log.setLevel(logging.INFO)
   log.addHandler(logging.handlers.SysLogHandler(address = (pxe_server,514)))

@@ -27,28 +27,37 @@ for line in iter(p.stdout.readline, b''):
 def check_user():
   from ldap3 import Server, Connection, SAFE_SYNC
   import getpass
-  # Проверка пользователя и пароля
   password_ok = "no"
+  group_ok = "no"
+  #
+  # Проверка пользователя и пароля
   while True:
     username = input("Имя пользователя " + domain + " (например ivanov_iv): ")
     password = getpass.getpass("Пароль пользователя: ")
     try:
-      conn = Connection(Server(ad_server), domain+'\\'+username, password, client_strategy=SAFE_SYNC, auto_bind=True)
-      status, result, response, _ = conn.search(search_base, '(objectclass=person)')
+      conn = Connection(Server(ad_server+'.'+domain), username+'@'+domain, password, client_strategy=SAFE_SYNC, auto_bind=True)
+      status, result, response, _ = conn.search('dc='+domain[0:domain.find('.')]+',dc='+domain[domain.find('.')+1:], '(objectclass=person)')
       password_ok = "yes"
+      log.info("PXE "+client_ip+" User "+username+" successfully authenticated")
       break
     except:
       print("Неверный пользователь/пароль")
-  # Проверка пользователя на принадлежность к группе
-  group_ok = "no"
+      log.info("PXE "+client_ip+" User "+username+" error authenticated")
+  #
+  # Проверка пользователя на принадлежность к группе установки
   try:
-    status, result, response, _ = conn.search(search_base, search_filter='(sAMAccountName='+ username +')', attributes=['memberof'])
+    status, result, response, _ = conn.search('dc='+domain[0:domain.find('.')]+',dc='+domain[domain.find('.')+1:], search_filter='(sAMAccountName='+ username +')', attributes=['memberof'])
     for entry in response[0]['attributes']['memberof']:
-      if entry.index(ad_group_install) != -1:
+      if entry.find(ad_group_install) != -1:
         group_ok = "yes"
+        log.info("PXE "+client_ip+" User "+username+" tested by group '"+ad_group_install+"'")
+        break
   except:
     pass
-  if group_ok == "no": print("Неверная группа пользователя"); sys.exit()
+  if group_ok == "no":
+    print("Пользователя нет в группе установки");
+    log.info("PXE "+client_ip+" User "+username+" not in group '"+ad_group_install+"'")
+    sys.exit()
 
 # Определение UEFI или BIOS
 def pefirmwaretype():
@@ -149,7 +158,7 @@ def install_win(win_ver):
   # Разметка диска и форматирование
   p = subprocess.Popen(["cmd", "/c", "diskpart /s ", workdir+"\\"+win_menu[win_menu.index(win_ver)+3]], stdout=subprocess.PIPE)
   print_cmd_stdout(p)
-  log.info("PXE "+client_ip+" Disk completed for install "+win_ver)
+  log.info("PXE "+client_ip+" Disk configured for install "+win_ver)
 
   # Установка из wim образа
   if win_ver == "winxp":
@@ -179,7 +188,6 @@ def install_win(win_ver):
 # Меню
 def run_menu():
   subprocess.run(["cmd", "/c", "title Меню установки - ",pefirmwaretype(),peimagebits()])
-  log.info("PXE "+client_ip+" Menu running")
   mes=""
   while mes != "0" and mes != "installed":
     # Очистка экрана и вывод шапки
@@ -198,7 +206,7 @@ def run_menu():
         win_menu[pos] = str(menu_num)
         print()
         print("      "+str(menu_num)+") "+win_menu[pos+3]+" (версия "+win_menu[pos+2]+")")
-        # Вывод дополнительной информации о возможности установки (проверка CPU)
+        # Вывод дополнительной информации о возможности установки операционной системы
         if install_warning(win_menu[pos+1]) != "":
           print("         ("+install_warning(win_menu[pos+1])+")")
       pos = pos + 5
@@ -219,8 +227,12 @@ def run_menu():
         install_win(win_menu[pos+1])
         break
       pos = pos + 5
+  #
   # Завершение работы
-  log.info("PXE "+client_ip+" Menu completed")
+  if mes == "0":
+    log.info("PXE "+client_ip+" Menu selected: "+mes+" exited to cmd")
+  else:
+    log.info("PXE "+client_ip+" Completed install process")
 
 #------------------------------------------------------------------------------------------------
 
@@ -241,6 +253,7 @@ if __name__ =='__main__':
       connect_no = False
       break
   if connect_no: print("Cannot run - no connection to PXE server"); sys.exit()
+  #
   # Файлы все на месте?
   if os.path.isfile('cpuid'+peimagebits()+'.exe') == False: print("Cannot run - cpuid"+peimagebits()+" not found"); sys.exit()
   try: subprocess.run(["cpuid"+peimagebits()],capture_output=True, encoding="utf-8").stdout
@@ -251,15 +264,17 @@ if __name__ =='__main__':
     if win_menu[pos] == "0" and os.path.isfile(win_menu[pos+4]) == False: print("Cannot run - file "+win_menu[pos+4]+" not found"); sys.exit()
     if win_menu[pos] == "0" and os.path.isfile(win_menu[pos+1]+"_"+win_menu[pos+2]+".wim") == False: print("Cannot run - file "+win_menu[pos+1]+"_"+win_menu[pos+2]+".wim"+" not found"); sys.exit()
     pos = pos + 5
-  # Проверка пользователя по группе в домене Active Directory
-  if not ignore_auth: check_user()
-  # -----------------------------------------------------------------------
-  # Все проверки прошли успешно
   #
   # Настройка логирования на PXE сервер
   # type="imudp" port="514"
   log = logging.getLogger('log')
   log.setLevel(logging.INFO)
   log.addHandler(logging.handlers.SysLogHandler(address = (pxe_server,514)))
+  log.info("PXE "+client_ip+" Started install process")
+  #
+  # Проверка пользователя по группе в домене Active Directory
+  if not ignore_auth: check_user()
+  # -----------------------------------------------------------------------
+  # Все проверки прошли успешно
   # Запуск меню
   run_menu()

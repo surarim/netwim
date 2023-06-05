@@ -208,14 +208,14 @@ def run_menu():
     menu_num = 0
     while pos < len(win_menu):
       # Номер 0 (определить номер пункта автоматически)
-      if int(win_menu[pos]) == 0:
+      if int(win_menu[pos]) != -1:
         menu_num = menu_num + 1
         win_menu[pos] = str(menu_num)
-        print()
-        print("      "+str(menu_num)+") "+win_menu[pos+3]+" (версия "+win_menu[pos+2]+")")
-        # Вывод дополнительной информации о возможности установки операционной системы
-        if install_warning(win_menu[pos+1]) != "":
-          print("         ("+install_warning(win_menu[pos+1])+")")
+      print()
+      print("      "+str(win_menu[pos])+") "+win_menu[pos+3]+" (версия "+win_menu[pos+2]+")")
+      # Вывод дополнительной информации о возможности установки операционной системы
+      if install_warning(win_menu[pos+1]) != "":
+        print("         ("+install_warning(win_menu[pos+1])+")")
       pos = pos + 5
     # Выбор пункта меню
     print()

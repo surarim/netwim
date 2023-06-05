@@ -5,16 +5,13 @@
 ignore_auth = True
 
 # Имя домена Active Directory
-domain = "DOM.LOCAL"
-
-# Путь поиска для проверки пользователя
-search_base = "dc=dom,dc=local"
+domain = "dom.local"
 
 # Имя контроллера домена Active Directory
-ad_server = "ads"
+ad_server = "adserver"
 
 # Имя группы Active Directory которой разрешена установка
-ad_group_install = "Domain Admins"
+ad_group_install = "install_group"
 
 # Настройки дисков
 volume1="S:"
@@ -33,5 +30,5 @@ win_menu=[
     "0","winxp","29.11.2019","Установка Windows XP SP3", "disk_mbr1.txt",
     "0","win7", "30.11.2022","Установка Windows 7 Pro SP1 (x64)", "disk_mbr2.txt",
     "0","win10","25.10.2022","Установка Windows 10 Pro (x64)", "disk_gpt2.txt",
-    "-1","win11","25.11.2022","Установка Windows 11 Pro (x64)", "disk_gpt2.txt"
+    "0","win11","05.06.2023","Установка Windows 11 Pro (x64)", "disk_gpt2.txt"
     ]
